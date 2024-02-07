@@ -4,41 +4,47 @@ import time
 import sqlite3
 
 URL = "https://programmer100.pythonanywhere.com/tours/"
-connection = sqlite3.connect("data.db")
-
-def scrape(url):
-    """Scrape the page from the URL."""
-    response = requests.get(url)
-    source = response.text
-    return source
 
 
-def extract(source):
-    extractor = selectorlib.Extractor.from_yaml_file("extract.yaml")
-    value = extractor.extract(source)["tour"]
-    return value
+class Event:
+    def scrape(self, url):
+        """Scrape the page from the URL."""
+        response = requests.get(url)
+        source = response.text
+        return source
+
+    def extract(self, source):
+        extractor = selectorlib.Extractor.from_yaml_file("extract.yaml")
+        value = extractor.extract(source)["tour"]
+        return value
 
 
-def store(extracted):
-    cursor = connection.cursor()
-    cursor.execute("INSERT INTO events Values(?,?,?)", extracted)
-    connection.commit()
+class DataBase:
+    def __init__(self, database_path):
+        self.connection = sqlite3.connect(database_path)
 
+    def store(self, extracted):
+        cursor = self.connection.cursor()
+        cursor.execute("INSERT INTO events Values(?,?,?)", extracted)
+        self.connection.commit()
 
-def read(extracted):
-    cursor = connection.cursor()
-    cursor.execute("SELECT * FROM events WHERE band=? AND city=? AND date=?",extracted)
-    return cursor.fetchall()
+    def read(self, extracted):
+        cursor = self.connection.cursor()
+        cursor.execute("SELECT * FROM events WHERE"
+                       " band=? AND city=? AND date=?", extracted)
+        return cursor.fetchall()
 
 
 if __name__ == "__main__":
     while True:
-        scraped = scrape(URL)
-        extracted = extract(scraped)
+        event = Event()
+        database = DataBase(database_path="data.db")
+        scraped = event.scrape(URL)
+        extracted = event.extract(scraped)
         if extracted != "No upcoming tours":
             extracted = extracted.split(",")
             extracted = [item.strip() for item in extracted]
-            dtbs = read(extracted)
+            dtbs = database.read(extracted)
             if not dtbs:
-                store(extracted)
+                database.store(extracted)
         time.sleep(3)
